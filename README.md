@@ -1,6 +1,6 @@
 # HY-World-Mirror-2.0 Plugin for LichtFeld Studio
 
-A feed-forward 3D reconstruction plugin for LichtFeld Studio. Runs Tencent's [HunyuanWorld-Mirror 2](https://github.com/Tencent-Hunyuan/HunyuanWorld-Mirror) on images, a video, or a COLMAP workspace and pushes Gaussian splats + camera poses + a point cloud straight into the scene — ready to view, train, or export.
+A feed-forward 3D reconstruction plugin for LichtFeld Studio. Runs Tencent's [HY-World-2.0](https://github.com/Tencent-Hunyuan/HY-World-2.0) on images, a video, or a COLMAP workspace and pushes Gaussian splats + camera poses + a point cloud straight into the scene — ready to view, train, or export.
 
 ## Features
 

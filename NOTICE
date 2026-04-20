@@ -9,8 +9,8 @@ Third-party code included in this distribution
 1. hyworld2/ (vendored Python package)
 ---------------------------------------
 Location in this repo:  hyworld2/
-Origin (Python package layout): Tencent HunyuanWorld-Mirror 2
-                                https://github.com/Tencent-Hunyuan/HunyuanWorld-Mirror
+Origin (Python package layout): Tencent HY-World-2.0
+                                https://github.com/Tencent-Hunyuan/HY-World-2.0
 Playground reference layout:    https://github.com/filliptm/HY-World-2.0-Playground
                                 (MIT; Copyright (c) 2026 filliptm)
 
