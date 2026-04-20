@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Regression guards for the bugs uncovered during the WSL clean-install
+  # audit (commits 3c7656d, 6e56df3). Each of these caught a real problem
+  # that shipped to users; don't remove them without a fix in the repo.
+  structure:
+    name: Structure integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .gitignore must root-anchor bulk rules
+        # Guards against 6e56df3. An unanchored `models/` pattern matches
+        # ANY directory named `models` at any depth — which silently
+        # excluded the entire hyworldmirror/models/ inference tree.
+        run: |
+          if grep -qE '^(models|cache|\.venv|uv\.lock)/?$' .gitignore; then
+            echo "FAIL: .gitignore contains an unanchored rule."
+            echo "Use root-anchored form (e.g. /models/) so it cannot"
+            echo "accidentally match nested directories with the same name."
+            grep -nE '^(models|cache|\.venv|uv\.lock)/?$' .gitignore
+            exit 1
+          fi
+
+      - name: Install scripts must be executable
+        # Guards against 3c7656d. .sh files stored as 100644 give Linux
+        # users "Permission denied" on first step of install.
+        run: |
+          for f in install.sh uninstall.sh; do
+            if ! test -x "$f"; then
+              echo "FAIL: $f is not marked executable (git mode != 100755)"
+              exit 1
+            fi
+          done
+
+      - name: Critical vendored files must be committed
+        # Guards against 6e56df3 recurring via a different path. If any
+        # of these go missing the plugin won't load at all.
+        run: |
+          set -e
+          for f in \
+            __init__.py \
+            pyproject.toml \
+            LICENSE \
+            NOTICE \
+            README.md \
+            install.sh \
+            install.ps1 \
+            core/pipeline_loader.py \
+            core/job.py \
+            core/direct_output.py \
+            core/downloads.py \
+            core/colmap_io.py \
+            core/vram_profile.py \
+            panels/main_panel.py \
+            panels/main_panel.rml \
+            panels/main_panel.rcss \
+            hyworld2/worldrecon/pipeline.py \
+            hyworld2/worldrecon/hyworldmirror/models/models/worldmirror.py \
+            hyworld2/worldrecon/hyworldmirror/models/heads/camera_head.py \
+            hyworld2/worldrecon/hyworldmirror/models/heads/dense_head.py \
+            hyworld2/worldrecon/hyworldmirror/models/heads/gs_head.py \
+            hyworld2/worldrecon/hyworldmirror/utils/inference_utils.py \
+            hyworld2/worldrecon/hyworldmirror/utils/save_utils.py \
+            hyworld2/worldrecon/hyworldmirror/utils/visual_util.py
+          do
+            test -f "$f" || { echo "MISSING: $f"; exit 1; }
+          done
+          echo "All critical files present."
+
+      - name: pyproject.toml must parse and advertise the right manifest
+        run: |
+          python - <<'PY'
+          import tomllib, sys
+          with open("pyproject.toml", "rb") as f:
+              data = tomllib.load(f)
+          proj = data.get("project", {})
+          lf   = data.get("tool", {}).get("lichtfeld", {})
+          missing = [k for k in ("name","version","description","authors","dependencies") if k not in proj]
+          missing += [f"tool.lichtfeld.{k}" for k in ("plugin_api","lichtfeld_version","required_features") if k not in lf]
+          if missing:
+              print("pyproject.toml missing keys:", missing)
+              sys.exit(1)
+          print(f"Name: {proj['name']} v{proj['version']}")
+          print(f"Plugin API: {lf['plugin_api']}")
+          PY
+
+  syntax:
+    name: Python syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile every tracked .py file
+        # Parse-only check; no imports, no deps. Catches SyntaxError
+        # across the plugin surface + the vendored hyworld2 package.
+        run: python -m compileall -q -f __init__.py core/ panels/ hyworld2/
+
+  resolve:
+    name: Dependency resolution (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - name: Resolve wheels (no download)
+        # `uv lock` performs a full resolution against PyPI + the custom
+        # pytorch-cu130 index but does NOT download any wheels. Fails CI
+        # if the torch / gsplat / triton / onnxruntime version set stops
+        # resolving cleanly on either OS.
+        run: uv lock --no-cache
