@@ -1,92 +1,119 @@
-# HY-World-Mirror-2.0 · LichtFeld Studio Plugin
+# HY-World-Mirror-2.0 Plugin for LichtFeld Studio
 
-Runs Tencent's [HunyuanWorld-Mirror 2](https://github.com/Tencent-Hunyuan/HunyuanWorld-Mirror) 3D reconstruction model inside LichtFeld Studio — feed it images, a video, or a COLMAP workspace and get Gaussian splats + poses + a point cloud either pushed straight into the scene (no files written) or saved as a trainable COLMAP dataset.
+A feed-forward 3D reconstruction plugin for LichtFeld Studio. Runs Tencent's [HunyuanWorld-Mirror 2](https://github.com/Tencent-Hunyuan/HunyuanWorld-Mirror) on images, a video, or a COLMAP workspace and pushes Gaussian splats + camera poses + a point cloud straight into the scene — ready to view, train, or export.
 
-## What you get
+## Features
 
-- **Input:** image folder, video file, or existing COLMAP workspace.
-- **Optional priors:** camera JSON and/or per-frame depth folder.
-- **"Use current LFS scene as prior"** — if the current scene was loaded from a COLMAP-style dataset, the plugin converts its poses + intrinsics into a prior and feeds them to inference.
-- **Three output modes:**
-  - **Direct** (default) — tensors go straight into the scene via `scene.add_splat` / `scene.add_camera` / `scene.add_point_cloud`; an in-memory trainer is built via `lf.prepare_training_from_scene()`. Zero files written.
-  - **Dataset** — writes a COLMAP workspace (`images/`, `sparse/0/`, `gaussians.ply`, `points.ply`, `camera_params.json`) and auto-imports it. Best when you want the dataset persisted for later re-training.
-  - **Both** — direct + dataset.
-- **Training-init buttons** after a run — "Train from splats" (refine WorldMirror's output) or "Train from points" (classical SfM-style random init from the point cloud).
+- **Three input modes**: image folder, video file, or existing COLMAP workspace (poses auto-extracted as prior).
+- **Three output modes**:
+  - **Direct** — tensors go straight into the LFS scene; in-memory trainer built via `lf.prepare_training_from_scene()`. Zero files written.
+  - **Dataset** — writes a COLMAP workspace (`images/`, `sparse/0/`, `gaussians.ply`, `points.ply`) and auto-imports.
+  - **Both** — preview instantly AND keep a trainable dataset on disk.
+- **Training-init buttons** — after a run, pick "Train from splats" (refine the WorldMirror output) or "Train from points" (classical random init from the point cloud).
+- **bf16 by default** on Ampere+ GPUs. Calibrated VRAM auto-fit avoids OOM on large frame counts.
+- **torch.compile** with persistent Inductor + Triton cache, gated behind a toggle.
+- **Auto-unload on training start** — frees the ~2.4 GB model from VRAM when the LFS trainer begins.
 
-## Performance
+## Installation
 
-- **bf16 by default** on Ampere+ GPUs (auto-detected). ~half the VRAM of fp32.
-- **Auto-fit target size** — probes free VRAM before inference and drops the effective `target_size` as needed. Avoids OOM on large frame counts.
-- **Calibrated VRAM profile** — learns your GPU's real bytes-per-pixel from actual runs (EWMA-smoothed), stored at `<plugin>/models/vram_profile.json`.
-- **Perf flags** lifted from the Playground backend: `cudnn.benchmark`, TF32 on Ampere+, `expandable_segments` (Linux only).
-- **Optional torch.compile** with a persistent Inductor + Triton cache at `<plugin>/cache/`. First forward at a new shape pays 30–60 s; subsequent forwards (and subsequent LFS launches) hit the cache.
-- **Warmup on Load Model** — a 2-frame 280×280 dummy forward pays cuDNN selection + PTX→SASS JIT + (optional) `torch.compile` up front.
-- **Auto-unload on training start** — frees the ~2.4 GB bf16 / 4.7 GB fp32 WorldMirror weights from VRAM when the LFS trainer starts.
+### Via LichtFeld UI (recommended)
 
-## Install
+1. Open LichtFeld Studio
+2. Go to the **Plugins** panel
+3. Paste the GitHub URL: `https://github.com/lyehe/Lichtfeld-HYWorld2-Plugin`
+4. Click **Install**
+5. Restart LichtFeld Studio
 
-**Fully self-contained** — the `hyworld2` Python package is vendored inside the plugin. No external Playground checkout needed. Model weights (~4.8 GB WorldMirror + 168 MB skyseg) download lazily into `<plugin>/models/` on first use.
+### Via Python
+
+```python
+import lichtfeld as lf
+lf.plugins.install("lyehe/Lichtfeld-HYWorld2-Plugin")
+```
+
+### Manual (dev symlink)
 
 ```powershell
 # Windows — no admin; uses a directory junction
+git clone https://github.com/lyehe/Lichtfeld-HYWorld2-Plugin
+cd Lichtfeld-HYWorld2-Plugin
 .\install.ps1
 ```
 
 ```bash
 # Linux / macOS
+git clone https://github.com/lyehe/Lichtfeld-HYWorld2-Plugin
+cd Lichtfeld-HYWorld2-Plugin
 ./install.sh
 ```
 
-This creates one link at `~/.lichtfeld/plugins/hyworld2_plugin/` pointing at the plugin directory. Launch LichtFeld Studio; on first load LFS runs `uv sync` in the plugin dir to install the CUDA wheels (torch 2.11 cu130, gsplat 1.5.3, onnxruntime-gpu, triton-windows on Windows, etc.). After that, plugin loads in ~2 s.
+On first load, LFS runs `uv sync` in the plugin dir to install the CUDA wheels (torch 2.11 cu130, gsplat, onnxruntime-gpu, triton-windows on Windows, etc.). Subsequent launches are near-instant. Model weights (~4.8 GB WorldMirror + 168 MB skyseg) download lazily into `<plugin>/models/` on first Run.
 
-Uninstall: `.\uninstall.ps1` / `./uninstall.sh` removes the junction, the `models/` cache, and the `cache/` (torch compile) cache.
+## Usage
+
+1. Open the **HY-World-Mirror-2** panel in LichtFeld Studio.
+2. Pick **Input type** — Image folder, Video file, or COLMAP workspace.
+3. Click **Browse** and select the path.
+4. Leave **Output mode** on **Direct** for fastest results, or switch to **Dataset** / **Both** if you want a COLMAP workspace on disk.
+5. Click **Load model** to pay the ~9 s model-to-GPU cost now (optional — Run does it lazily otherwise).
+6. Click **Run Reconstruction**.
+7. When the run finishes, either:
+   - Explore the scene directly (splats, cameras, point cloud are already there), or
+   - Click **Train from splats** / **Train from points** and hit Start Training in the built-in Training panel.
+
+## Configuration
+
+Settings (collapsible in the panel):
+
+- **Target size** — longest-edge pixel count the model sees. Higher = more detail, quadratically more VRAM. Auto-fit treats this as an upper bound.
+- **bfloat16 inference** — ~half VRAM, Ampere+ only. On by default when supported.
+- **Auto-fit target size** — probes free VRAM before inference and drops the effective target if needed.
+- **Unload model after each Run** — releases ~2.4 GB bf16 / 4.7 GB fp32. Costs ~9 s on next Run.
+- **Reset VRAM calibration** — wipe the learned profile (useful after GPU swap).
+- **torch.compile** (experimental) — 30-60 s first-forward compile cost; cached to disk across sessions.
+- **FP32 heads** — slower, tighter numerical parity with an fp32 baseline.
+
+## Output
+
+**Direct mode** adds a scene group per run:
+
+```
+HY-World-Mirror-2 (run_<timestamp>)
+├── splats        (pruned Gaussian splats — training model)
+├── cameras       (one node per frame, with image_path)
+└── points        (back-projected colored point cloud)
+```
+
+**Dataset / Both mode** also writes to your chosen output folder:
+
+```
+<output_dir>/
+├── _frames/                      (staged input frames at inference res)
+├── images/                       (frames resized to sparse/0/cameras.txt dims)
+├── sparse/0/
+│   ├── cameras.txt
+│   ├── images.txt
+│   └── points3D.txt              (populated from points.ply)
+├── gaussians.ply                 (pretrained Gaussian splats, logit opacity)
+├── points.ply                    (colored point cloud)
+└── camera_params.json
+```
 
 ## Requirements
 
-- CUDA GPU — Ampere-class (RTX 30xx) or newer for bf16 default. Turing and older work with bf16 off.
-- LFS's bundled Python 3.12. `uv sync` pulls everything else.
-- ~10 GB free disk for the plugin venv + model cache.
+- **GPU**: CUDA-capable. Ampere-class (RTX 30xx) or newer recommended for bf16. Turing and older work with bf16 off.
+- **VRAM**: ~4 GB for small runs; 12-24 GB recommended for 32-frame / high-res runs.
+- **Disk**: ~5 GB for the plugin venv + ~5 GB for model weights.
 
-## Architecture
+## Model weights
 
-```
-Run click
-  │
-  ├─► prepare_input  (glob or extract frames)
-  ├─► pipeline_loader.get_pipeline(bf16, compile, ...)
-  │     └─ cached; reloads only on flag change
-  ├─► auto_fit target_size ← vram_profile + free VRAM probe
-  ├─► intercept save_results → capture predictions dict
-  ├─► pipeline(...) forward pass                    ← INFERENCE
-  ├─► vram_profile.record_run  (isolated activation bytes)
-  │
-  ├─ direct mode:
-  │   └─► resave staged frames at inference resolution → outdir/_frames/
-  │       scene.add_splat (log-scaled, logit opacity, voxel-pruned)
-  │       scene.add_camera (world→cam, fx/fy for actual image dims)
-  │       scene.add_point_cloud (back-projected from depth)
-  │       lf.prepare_training_from_scene()          ← IN-MEMORY TRAINER
-  │
-  └─ dataset mode:
-      └─► _populate_images_dir (resize originals to cameras.txt dims)
-          _populate_points3d (hydrate from points.ply)
-          lf.load_file(outdir, is_dataset=True, init_path=gaussians.ply)
-```
+Downloaded lazily from HuggingFace on first Run:
 
-## Known limits
+- `tencent/HY-World-2.0` (subfolder: `HY-WorldMirror-2.0`) — ~4.8 GB, under the **Tencent HY-World 2.0 Community License** (geographically restricted).
+- `JianyuanWang/skyseg` — 168 MB.
 
-- Single-GPU only. Multi-GPU FSDP is not exposed.
-- Inference is not interruptible — Cancel takes effect at stage boundaries, not mid-forward.
-- `torch.compile` is experimental; failures fall back to eager execution silently (check the `Build:` status line to see whether compile is actually active).
+The plugin does not redistribute weights; they come from HuggingFace under their respective licenses.
 
-## Licensing
+## License
 
-- **Plugin code** — MIT. See [LICENSE](LICENSE).
-- **Vendored `hyworld2/`** — MIT, copied from [filliptm/HY-World-2.0-Playground](https://github.com/filliptm/HY-World-2.0-Playground). See [NOTICE](NOTICE).
-- **WorldMirror model weights** — downloaded at runtime from `tencent/HY-World-2.0` on HuggingFace under the **Tencent HY-World 2.0 Community License**, which is geographically restricted. The plugin does not redistribute weights; users obtain them directly from HuggingFace under that license.
-
-## Credits
-
-- **Tencent** for the HunyuanWorld-Mirror model and the original Python inference code.
-- The inference perf work in the vendored `hyworld2/` — SDPA backend-priority pin, cuDNN + PTX warmup, boot-time TF32 / `cudnn.benchmark` / `expandable_segments` flags, vectorized `_voxel_prune_gaussians`, parallelized `prepare_images_to_tensor`, ONNX sky-mask / GPU-forward overlap, pycolmap-free COLMAP writer, bf16 head gating via `HYWORLD_FP32_HEADS`, and the OOM-retry inference loop — is my own, originally landed in my local copy of the Playground layout; refer to [@filliptm/HY-World-2.0-Playground](https://github.com/filliptm/HY-World-2.0-Playground) only for the Playground's original API / file layout.
-- [LichtFeld Studio](https://github.com/MrNeRF/LichtFeld-Studio) for the plugin host.
+MIT — see [LICENSE](LICENSE) for the plugin code, [NOTICE](NOTICE) for third-party attributions.
