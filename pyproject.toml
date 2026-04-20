@@ -32,12 +32,14 @@ dependencies = [
     "onnxruntime ; platform_system != 'Windows'",              # skyseg
     "onnxruntime-gpu==1.19.2 ; platform_system == 'Windows'",
     "triton-windows>=3.5 ; platform_system == 'Windows'",      # required by torch-cu130 on Windows
-    # gsplat JIT-compiles CUDA kernels on first import; needs nvcc. Windows
-    # users ship nvcc via the standalone CUDA Toolkit installer (PATH). On
-    # Linux we bundle it so users don't need a system-wide CUDA Toolkit —
-    # only `build-essential` (gcc/g++) as host compiler.
-    "nvidia-cuda-nvcc ; platform_system == 'Linux'",
 ]
+# Note on nvcc:
+#   gsplat==1.5.3 is a pure-Python wheel that JIT-compiles its CUDA kernels
+#   on first import, so every user (Windows or Linux) needs nvcc + a host
+#   C/C++ compiler on PATH. We do NOT ship nvcc as a pip wheel because the
+#   split-package CUDA 13.x pip wheels (nvidia-cuda-nvcc / cccl / nvvm /
+#   crt) release out-of-sync versions and fail cccl's internal version
+#   check — see README "Requirements" for the system-install route.
 
 # Dropped vs upstream hyworld2 pyproject (none of these are reached by the
 # plugin's inference path after pruning):

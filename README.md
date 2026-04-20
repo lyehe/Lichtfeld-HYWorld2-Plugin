@@ -112,13 +112,9 @@ HY-World-Mirror-2 (run_<timestamp>)
 - **GPU**: CUDA-capable. Ampere-class (RTX 30xx) or newer recommended for bf16. Turing and older work with bf16 off.
 - **VRAM**: ~4 GB for small runs; 12-24 GB recommended for 32-frame / high-res runs.
 - **Disk**: ~5 GB for the plugin venv + ~5 GB for model weights.
-- **Linux only — host compiler**: `gcc` / `g++` must be on `PATH` for gsplat's first-run CUDA JIT (`nvcc` is bundled via the `nvidia-cuda-nvcc` pip wheel, so a system-wide CUDA Toolkit is not required).
-  ```bash
-  sudo apt install build-essential        # Debian/Ubuntu
-  sudo dnf install gcc-c++ make           # Fedora/RHEL
-  sudo pacman -S base-devel               # Arch
-  ```
-  Windows users ship `nvcc` via the standalone CUDA Toolkit installer — no extra action needed.
+- **CUDA Toolkit**: gsplat JIT-compiles CUDA kernels on first import, so `nvcc` + a host C/C++ compiler must be resolvable on every platform.
+  - **Windows** — install the [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (bundles nvcc + MSVC integration). The installer adds `nvcc` to `PATH`.
+  - **Linux** — install the CUDA Toolkit via your distro's NVIDIA repo (not the stale distro-packaged version), then `apt install build-essential` (or `dnf install gcc-c++ make` / `pacman -S base-devel`). The plugin auto-detects toolkits at `/usr/local/cuda*` or `/opt/cuda`; set `CUDA_HOME` manually for non-standard locations.
 
 ## Model weights
 

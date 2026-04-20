@@ -56,19 +56,29 @@ echo "       -> $plugin_root"
 echo ""
 echo "Install complete."
 
-# Linux-only preflight: gsplat JIT-compiles CUDA kernels on first import and
-# needs both `nvcc` (bundled via the `nvidia-cuda-nvcc` pip wheel — installed
-# automatically by `uv sync`) and `gcc` as the host compiler. The host gcc
-# is NOT in the venv and must be installed system-wide.
+# Linux-only preflight: gsplat 1.5.3 is a pure-Python wheel and JIT-compiles
+# its CUDA kernels on first import, so the user needs BOTH the NVIDIA CUDA
+# Toolkit (nvcc + headers, auto-detected at /usr/local/cuda*) and a host
+# C/C++ compiler (gcc/g++). Warn loudly if either is missing.
 if [[ "$(uname)" == "Linux" ]]; then
-    if ! command -v gcc >/dev/null 2>&1; then
+    need_toolkit=0
+    if ! command -v nvcc >/dev/null 2>&1 \
+       && [[ ! -x /usr/local/cuda/bin/nvcc ]] \
+       && ! ls /usr/local/cuda-*/bin/nvcc >/dev/null 2>&1; then
+        need_toolkit=1
+    fi
+    need_gcc=0
+    command -v gcc >/dev/null 2>&1 || need_gcc=1
+
+    if (( need_toolkit )) || (( need_gcc )); then
         echo ""
-        echo "WARNING: 'gcc' not found in PATH."
-        echo "  gsplat will fail to build its CUDA kernels on first run."
-        echo "  Fix with:"
-        echo "      sudo apt install build-essential        # Debian/Ubuntu"
-        echo "      sudo dnf install gcc-c++ make           # Fedora/RHEL"
-        echo "      sudo pacman -S base-devel               # Arch"
+        echo "WARNING: missing prerequisites for gsplat's first-run CUDA JIT:"
+        (( need_toolkit )) && echo "  * NVIDIA CUDA Toolkit (nvcc). Install from:"
+        (( need_toolkit )) && echo "      https://developer.nvidia.com/cuda-downloads"
+        (( need_gcc      )) && echo "  * Host C/C++ compiler (gcc/g++). Install via:"
+        (( need_gcc      )) && echo "      sudo apt install build-essential     # Debian/Ubuntu"
+        (( need_gcc      )) && echo "      sudo dnf install gcc-c++ make        # Fedora/RHEL"
+        (( need_gcc      )) && echo "      sudo pacman -S base-devel            # Arch"
     fi
 fi
 

@@ -39,19 +39,19 @@ _TRITON_CACHE.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("TORCHINDUCTOR_CACHE_DIR", str(_COMPILE_CACHE))
 os.environ.setdefault("TRITON_CACHE_DIR", str(_TRITON_CACHE))
 
-# --- Linux: point gsplat's JIT at the venv-local nvcc (nvidia-cuda-nvcc
-# wheel) so users don't need a system-wide CUDA Toolkit. We scan the venv
-# site-packages for nvidia/*/bin/nvcc and set CUDA_HOME + prepend to PATH.
-# Windows users ship nvcc via the standalone CUDA Toolkit installer; we
-# don't touch CUDA_HOME there.
+# --- Linux: auto-point gsplat's JIT at a system CUDA Toolkit if the user
+# hasn't already set CUDA_HOME. gsplat 1.5.3 is a pure-Python wheel that
+# JIT-compiles CUDA kernels on first import, so nvcc must be resolvable.
+# We check the standard install locations; first hit wins. Windows users
+# get nvcc via the standalone CUDA Toolkit installer's PATH entry; we
+# don't touch CUDA_HOME on Windows.
 if sys.platform.startswith("linux") and "CUDA_HOME" not in os.environ:
-    for _cand in _PLUGIN_DIR.glob(
-        ".venv/lib/python*/site-packages/nvidia/*/bin/nvcc"
-    ):
-        _cuda_root = _cand.parent.parent  # .../nvidia/<variant>
-        os.environ["CUDA_HOME"] = str(_cuda_root)
-        os.environ["PATH"] = str(_cuda_root / "bin") + os.pathsep + os.environ.get("PATH", "")
-        break
+    import glob as _glob
+    for _cand in sorted(_glob.glob("/usr/local/cuda*"), reverse=True) + ["/opt/cuda"]:
+        if Path(_cand, "bin", "nvcc").exists():
+            os.environ["CUDA_HOME"] = _cand
+            os.environ["PATH"] = f"{_cand}/bin" + os.pathsep + os.environ.get("PATH", "")
+            break
 
 # Expose the vendored `hyworld2` Python package on sys.path.
 if str(_PLUGIN_DIR) not in sys.path:
