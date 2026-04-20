@@ -62,6 +62,20 @@ name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
+[tool.ruff]
+# Only lint first-party code. The vendored `hyworld2/` tree is upstream
+# code we don't control the style of — format churn there would create
+# merge conflicts when pulling new HY-World-2.0 releases.
+extend-exclude = ["hyworld2", ".venv", "cache", "models"]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# Defaults (E, F) plus a few hygiene groups. Keep tight — this is CI-gated.
+select = ["E", "F", "W", "I", "UP", "B"]
+# Long lines only in strings/comments are common in UI/log text; let them be.
+ignore = ["E501"]
+
 [tool.lichtfeld]
 # Hot-reload disabled: plugin owns ~5 GB of cached models + a 4.8 GB venv;
 # churning on every .py save is too expensive. Restart LFS to pick up edits.

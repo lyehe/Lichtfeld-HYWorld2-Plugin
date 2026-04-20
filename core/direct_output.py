@@ -11,11 +11,10 @@ Tensors move zero-copy via ``lf.Tensor.from_dlpack(torch_tensor)``.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
 
 import lichtfeld as lf
-
 
 SH_C0 = 0.28209479177387814  # Same constant hyworld2 uses for f_dc <-> rgb.
 
@@ -33,8 +32,8 @@ def apply_predictions_to_scene(
     point_cloud_max_points: int = 500_000,
     gs_max_points: int = 5_000_000,
     voxel_prune_size: float = 0.002,
-    log: Optional[callable] = None,
-) -> Optional[dict]:
+    log: callable | None = None,
+) -> dict | None:
     """Materialise splats + cameras + optional point cloud as LFS scene nodes.
 
     Returns a dict with info needed by the panel for training-mode switches:
@@ -117,9 +116,9 @@ def add_splats_from_points(
     node_name: str,
     parent_id: int = -1,
     init_opacity: float = 0.1,
-    init_scale: Optional[float] = None,
-    log: Optional[callable] = None,
-) -> Optional[str]:
+    init_scale: float | None = None,
+    log: callable | None = None,
+) -> str | None:
     """Create a splat node from a point cloud — seed for random-init training.
 
     Each point becomes one isotropic gaussian:
@@ -133,6 +132,7 @@ def add_splats_from_points(
     """
     _log = log or (lambda _msg: None)
     import math
+
     import numpy as np
     import torch
 
@@ -206,7 +206,7 @@ def add_splats_from_points(
     return node_name
 
 
-def set_training_node(node_name: str, log: Optional[callable] = None) -> bool:
+def set_training_node(node_name: str, log: callable | None = None) -> bool:
     """Tell LFS to use ``node_name`` as the training model node."""
     _log = log or (lambda _msg: None)
     try:
@@ -258,6 +258,7 @@ def _add_splats(
         return ""
     import numpy as np
     import torch
+
     from hyworld2.worldrecon.hyworldmirror.utils.inference_utils import _voxel_prune_gaussians
 
     sp = predictions["splats"]
@@ -443,8 +444,9 @@ def _add_point_cloud(scene, predictions, imgs, parent_id, node_name, max_points,
         return None, None, ""
     import numpy as np
     import torch
-    from hyworld2.worldrecon.hyworldmirror.utils.inference_utils import _compute_points_from_depth
+
     from hyworld2.worldrecon.hyworldmirror.models.utils.camera_utils import vector_to_camera_matrices
+    from hyworld2.worldrecon.hyworldmirror.utils.inference_utils import _compute_points_from_depth
 
     B, S, C, H, W = imgs.shape
     e3x4, intr = vector_to_camera_matrices(predictions["camera_params"], image_hw=(H, W))
@@ -464,7 +466,7 @@ def _add_point_cloud(scene, predictions, imgs, parent_id, node_name, max_points,
 
     # LFS add_point_cloud wants [N,3] positions and [N,3] or [N,4] colors (0..1 float).
     pts = torch.from_numpy(np.ascontiguousarray(pts_np.astype(np.float32))).contiguous()
-    cols_f = np.ascontiguousarray((cols_np.astype(np.float32) / 255.0))
+    cols_f = np.ascontiguousarray(cols_np.astype(np.float32) / 255.0)
     cols = torch.from_numpy(cols_f).contiguous()
     points_name = f"{node_name} / points"
     try:

@@ -18,10 +18,9 @@ import threading
 import time
 import traceback
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 import lichtfeld as lf
 
@@ -137,7 +136,9 @@ def _fit_target_size_to_vram(user_target: int, num_frames: int, bf16: bool,
     """
     try:
         import math
+
         import torch
+
         from . import vram_profile
         if not torch.cuda.is_available():
             return None
@@ -179,13 +180,13 @@ class HyWorld2Job:
         self.cfg = cfg
 
         self._lock = threading.Lock()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._cancelled = False
 
         self._stage = JobStage.IDLE
         self._progress = 0.0
         self._status = ""
-        self._result: Optional[JobResult] = None
+        self._result: JobResult | None = None
         self._log: deque[str] = deque(maxlen=48)
 
     # ------------------------------------------------------------------ props
@@ -205,7 +206,7 @@ class HyWorld2Job:
             return self._status
 
     @property
-    def result(self) -> Optional[JobResult]:
+    def result(self) -> JobResult | None:
         with self._lock:
             return self._result
 
@@ -470,6 +471,7 @@ class HyWorld2Job:
         # -------- VRAM calibration: record peak usage ------------------
         try:
             import torch
+
             from . import vram_profile
             if torch.cuda.is_available():
                 peak = int(torch.cuda.max_memory_allocated())
@@ -592,6 +594,7 @@ class HyWorld2Job:
             pass
         try:
             import gc
+
             import torch
             gc.collect()
             if torch.cuda.is_available():
@@ -691,7 +694,6 @@ class HyWorld2Job:
             shutil.rmtree(staged_dir, ignore_errors=True)
         staged_dir.mkdir(parents=True, exist_ok=True)
 
-        import numpy as np
         for i in range(n):
             arr = (tensor[0, i].permute(1, 2, 0).numpy() * 255.0 + 0.5).clip(0, 255).astype("uint8")
             dst = staged_dir / f"image_{i + 1:04d}.jpg"

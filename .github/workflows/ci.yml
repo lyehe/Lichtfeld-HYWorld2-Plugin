@@ -92,18 +92,19 @@ jobs:
           print(f"Plugin API: {lf['plugin_api']}")
           PY
 
-  syntax:
-    name: Python syntax check
+  lint:
+    name: Ruff lint + syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/ruff-action@v3
         with:
-          python-version: '3.12'
-      - name: Compile every tracked .py file
-        # Parse-only check; no imports, no deps. Catches SyntaxError
-        # across the plugin surface + the vendored hyworld2 package.
-        run: python -m compileall -q -f __init__.py core/ panels/ hyworld2/
+          # Pin to a specific ruff version so CI doesn't silently upgrade
+          # and start failing on a new rule. Bump explicitly when desired.
+          version: "0.14.8"
+          # Config lives in pyproject.toml [tool.ruff]. Scope excludes
+          # the vendored hyworld2/ tree (upstream code, not ours).
+          args: "check ."
 
   resolve:
     name: Dependency resolution (${{ matrix.os }})

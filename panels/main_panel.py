@@ -6,13 +6,11 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Optional
 
 import lichtfeld as lf
 
 from ..core import colmap_io, direct_output, downloads, pipeline_loader, vram_profile
-from ..core.job import HyWorld2Job, JobConfig, JobResult, JobStage
-
+from ..core.job import HyWorld2Job, JobConfig, JobResult
 
 _INPUT_TYPES = ["images", "video", "colmap"]
 _DEFAULT_OUTPUT_ROOT = str(Path.home() / "hyworld2_out")
@@ -118,8 +116,8 @@ class HYWorld2Panel(lf.ui.Panel):
         self.enable_fp32_heads = False
 
         # Job
-        self._job: Optional[HyWorld2Job] = None
-        self._last_result: Optional[JobResult] = None
+        self._job: HyWorld2Job | None = None
+        self._last_result: JobResult | None = None
         self._loaded_result_key: object = None
 
         # Post-job secondary-load state (shown after success)
@@ -129,7 +127,7 @@ class HYWorld2Panel(lf.ui.Panel):
         # Model load state: "idle" | "loading" | "ready" | "error"
         self._model_load_state = "idle"
         self._model_load_error = ""
-        self._model_load_thread: Optional[threading.Thread] = None
+        self._model_load_thread: threading.Thread | None = None
 
         # UI diff state for on_update
         self._last_stage = ""
@@ -294,7 +292,7 @@ class HYWorld2Panel(lf.ui.Panel):
         return f"{dl / 1_000_000_000:.2f} / {total / 1_000_000_000:.2f} GB"
 
     @staticmethod
-    def _result_key(r: Optional[JobResult]):
+    def _result_key(r: JobResult | None):
         if r is None:
             return None
         return (r.success, r.output_dir, r.elapsed_s, r.error, r.num_frames)
@@ -985,7 +983,7 @@ class HYWorld2Panel(lf.ui.Panel):
 
     # ------------------------------------------------------------------
     # Post-job
-    def _handle_job_finished(self, result: Optional[JobResult]) -> None:
+    def _handle_job_finished(self, result: JobResult | None) -> None:
         if result is None or not result.success:
             return
         if self._loaded_result_key == self._last_result_key:

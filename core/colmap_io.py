@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 
 @dataclass
@@ -25,9 +24,9 @@ class _Camera:
     model: str
     width: int
     height: int
-    params: List[float]
+    params: list[float]
 
-    def intrinsic_matrix(self) -> List[List[float]]:
+    def intrinsic_matrix(self) -> list[list[float]]:
         m = self.model.upper()
         p = self.params
         if m in ("SIMPLE_PINHOLE", "SIMPLE_RADIAL", "SIMPLE_RADIAL_FISHEYE"):
@@ -41,8 +40,8 @@ class _Camera:
         return [[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]]
 
 
-def _parse_cameras_txt(path: Path) -> Dict[int, _Camera]:
-    cams: Dict[int, _Camera] = {}
+def _parse_cameras_txt(path: Path) -> dict[int, _Camera]:
+    cams: dict[int, _Camera] = {}
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -58,14 +57,14 @@ def _parse_cameras_txt(path: Path) -> Dict[int, _Camera]:
     return cams
 
 
-def _quat_wxyz_to_rotmat(qw: float, qx: float, qy: float, qz: float) -> List[List[float]]:
+def _quat_wxyz_to_rotmat(qw: float, qx: float, qy: float, qz: float) -> list[list[float]]:
     n = qw * qw + qx * qx + qy * qy + qz * qz
     if n < 1e-12:
         return [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
     s = 2.0 / n
-    xx = qx * qx * s; yy = qy * qy * s; zz = qz * qz * s
-    xy = qx * qy * s; xz = qx * qz * s; yz = qy * qz * s
-    wx = qw * qx * s; wy = qw * qy * s; wz = qw * qz * s
+    xx, yy, zz = qx * qx * s, qy * qy * s, qz * qz * s
+    xy, xz, yz = qx * qy * s, qx * qz * s, qy * qz * s
+    wx, wy, wz = qw * qx * s, qw * qy * s, qw * qz * s
     return [
         [1.0 - (yy + zz), xy - wz,         xz + wy],
         [xy + wz,         1.0 - (xx + zz), yz - wx],
@@ -73,7 +72,7 @@ def _quat_wxyz_to_rotmat(qw: float, qx: float, qy: float, qz: float) -> List[Lis
     ]
 
 
-def _parse_images_txt(path: Path) -> List[Tuple[int, List[List[float]], List[float], int, str]]:
+def _parse_images_txt(path: Path) -> list[tuple[int, list[list[float]], list[float], int, str]]:
     """Return list of (image_id, R_3x3, t_3, camera_id, name).
 
     COLMAP writes two lines per image: the header (pose + name) followed by

@@ -73,6 +73,7 @@ def get_pipeline(model_id: str = "tencent/HY-World-2.0",
             _loaded_compile_mode = compile_mode if enable_compile else ""
             try:
                 import torch
+
                 from . import vram_profile
                 if torch.cuda.is_available():
                     after = torch.cuda.memory_allocated()

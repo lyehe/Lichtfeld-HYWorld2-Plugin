@@ -14,8 +14,8 @@ import shutil
 import threading
 import time
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 PLUGIN_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = PLUGIN_DIR / "models"
@@ -41,8 +41,14 @@ _state = {
     "bytes_downloaded": 0,
     "bytes_total": 0,
 }
-_thread: Optional[threading.Thread] = None
-_log_fn: Callable[[str], None] = lambda msg: None
+_thread: threading.Thread | None = None
+
+
+def _noop_log(_msg: str) -> None:
+    return None
+
+
+_log_fn: Callable[[str], None] = _noop_log
 
 
 def get_state() -> dict:
