@@ -1,0 +1,58 @@
+Lichtfeld-HYWorld2-Plugin
+Copyright (c) 2026 Yehe Liu
+Licensed under the MIT License (see LICENSE).
+
+
+Third-party code included in this distribution
+===============================================
+
+1. hyworld2/ (vendored Python package)
+---------------------------------------
+Location in this repo:  hyworld2/
+Source:                 https://github.com/filliptm/HY-World-2.0-Playground
+License:                MIT (Copyright (c) 2026 filliptm)
+
+The `hyworld2/` directory is a verbatim copy of the Python package from the
+Playground fork above, with two local modifications documented inline:
+
+  - hyworld2/worldrecon/hyworldmirror/utils/save_utils.py
+        Stores the opacity field as logit (pre-sigmoid) in the output PLY
+        so the file round-trips correctly through any standard 3D Gaussian
+        Splatting viewer, including LichtFeld Studio's own loader. Upstream
+        stored it post-sigmoid, which double-sigmoids on reload.
+
+  - hyworld2/worldrecon/hyworldmirror/utils/visual_util.py
+        Trimmed to the three functions the inference path actually uses
+        (segment_sky, run_skyseg, download_file_from_url). Dropped the
+        GLB-mesh / gradio-viewer code and the matplotlib / trimesh /
+        scipy / requests imports that went with it.
+
+Also dropped from the vendored copy:
+  - hyworld2/worldrecon/gradio_app.py  (web UI, not used by the plugin)
+
+
+2. Model weights (downloaded at runtime, NOT redistributed)
+-----------------------------------------------------------
+On first Run, the plugin downloads these into <plugin>/models/:
+
+  - tencent/HY-World-2.0 (subfolder: HY-WorldMirror-2.0) — ~4.8 GB
+        License:  Tencent HY-WORLD 2.0 Community License Agreement
+        Source:   https://huggingface.co/tencent/HY-World-2.0
+        Note:     Geographically restricted per the license terms.
+
+  - JianyuanWang/skyseg (skyseg.onnx) — 168 MB
+        Source:   https://huggingface.co/JianyuanWang/skyseg
+
+Users acquire these weights directly from HuggingFace under their respective
+licenses. The plugin itself does not bundle, mirror, or redistribute any
+model weights.
+
+
+3. Python runtime dependencies
+-------------------------------
+Installed from PyPI / the pytorch-cu130 index on first plugin load via `uv
+sync`. Each dependency carries its own license; see the individual package
+metadata. Notable deps: torch (BSD), torchvision (BSD), gsplat (Apache-2.0),
+huggingface-hub (Apache-2.0), onnxruntime (MIT), triton-windows (MIT),
+opencv-python (Apache-2.0), pillow (HPND), plyfile (GPL-3.0-or-later),
+safetensors (Apache-2.0).

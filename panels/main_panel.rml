@@ -1,0 +1,256 @@
+<rml>
+<head>
+  <link type="text/rcss" href="main_panel.rcss"/>
+</head>
+<body data-model="hyworld2">
+<div id="content-wrap">
+<div id="content">
+
+  <span class="panel-title text-accent">HY-World-Mirror-2</span>
+  <span class="panel-subtitle text-muted">Reconstruct a 3D scene from images or video using Tencent's HunyuanWorld-Mirror 2.</span>
+
+  <!-- ============ Model download banner ============ -->
+  <div class="model-banner" data-if="models_downloading">
+    <span class="status-line text-accent">Downloading models to plugin dir...</span>
+    <span class="help-text text-muted">{{model_stage_text}}</span>
+    <div class="progress-wrap">
+      <progress class="job-progress" max="1" data-attr-value="model_progress_value"></progress>
+      <span class="progress-text">{{model_progress_pct}} - {{model_bytes_line}}</span>
+    </div>
+  </div>
+  <div class="model-banner" data-if="models_error">
+    <span class="status-error">Model download failed</span>
+    <span class="error-detail text-default">{{model_error_text}}</span>
+    <button class="btn btn--warning btn--full" data-event-click="retry_download">Retry download</button>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- ============ Input ============ -->
+  <span class="section-title text-accent">Input</span>
+
+  <div class="setting-row" title="Images: folder of JPG/PNG. Video: single mp4/mov/etc. COLMAP: a workspace folder containing sparse/ and images/ — poses load as inference prior.">
+    <span class="prop-label">Type</span>
+    <select data-value="input_type">
+      <option value="images">Image folder</option>
+      <option value="video">Video file</option>
+      <option value="colmap">COLMAP workspace</option>
+    </select>
+  </div>
+
+  <div class="setting-row">
+    <span class="prop-label">Path</span>
+    <input type="text" data-value="input_path"/>
+  </div>
+
+  <div class="button-row">
+    <button class="btn btn--default btn--full" data-event-click="browse_input">{{browse_input_label}}</button>
+  </div>
+  <div class="button-row" data-if="show_use_scene_btn">
+    <button class="btn btn--default btn--full" data-event-click="use_current_scene" title="Extract camera poses from the currently-loaded LFS scene (must have been loaded from COLMAP) and use them as an inference prior.">Use current LFS scene as prior</button>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- ============ Output ============ -->
+  <span class="section-title text-accent">Output</span>
+  <div class="setting-row" title="Direct is fastest — no file I/O. Dataset writes a COLMAP workspace you can re-train later. Both gives you the scene preview + the dataset in one run.">
+    <span class="prop-label">Mode</span>
+    <select data-value="output_mode">
+      <option value="direct">Direct - scene + in-memory trainer (no files)</option>
+      <option value="dataset">Dataset - write COLMAP files (for re-training later)</option>
+      <option value="both">Both - direct AND write files</option>
+    </select>
+  </div>
+  <span class="help-text text-muted">All three modes create an LFS trainer so you can refine the output. "Direct" keeps everything in memory. "Dataset" / "Both" also persist a COLMAP workspace to disk.</span>
+  <div class="setting-row">
+    <span class="prop-label">Folder</span>
+    <input type="text" data-value="output_dir"/>
+  </div>
+  <button class="btn btn--default btn--full" data-event-click="browse_output">Browse Output Folder</button>
+
+  <div class="separator"></div>
+
+  <!-- ============ Priors (optional) ============ -->
+  <div class="section-header" data-event-click="toggle_section('priors')">
+    <span class="section-arrow" id="arrow-priors">&#x25B6;</span>
+    <span>Priors (optional)</span>
+  </div>
+  <div class="section-content collapsed" id="sec-priors">
+    <span class="help-text text-muted">Optional priors that guide inference. Accepts either a COLMAP workspace (the folder containing sparse/) or a hyworld2 camera_params.json. Depth priors are a folder of .npy/.exr/.png depth maps.</span>
+
+    <div class="setting-row">
+      <span class="prop-label">Camera prior</span>
+      <input type="text" data-value="prior_cam_path"/>
+    </div>
+    <div class="button-row">
+      <button class="btn btn--default" data-event-click="browse_prior_cam">Browse (COLMAP or JSON)</button>
+      <button class="btn btn--default" data-event-click="clear_prior_cam">Clear</button>
+    </div>
+
+    <div class="setting-row">
+      <span class="prop-label">Depth folder</span>
+      <input type="text" data-value="prior_depth_path"/>
+    </div>
+    <div class="button-row">
+      <button class="btn btn--default" data-event-click="browse_prior_depth">Browse</button>
+      <button class="btn btn--default" data-event-click="clear_prior_depth">Clear</button>
+    </div>
+  </div>
+
+  <!-- ============ Advanced ============ -->
+  <div class="section-header" data-event-click="toggle_section('advanced')">
+    <span class="section-arrow" id="arrow-advanced">&#x25B6;</span>
+    <span>Settings</span>
+  </div>
+  <div class="section-content collapsed" id="sec-advanced">
+    <div class="setting-row" title="Longest-edge resolution (in pixels) the model receives. Higher = more detail but quadratically more VRAM. 280 and 952 are common; values snap to multiples of 14 (the ViT patch size). If Auto-fit is on below, this is treated as an upper bound.">
+      <span class="prop-label">Target size</span>
+      <input type="range" class="setting-slider" data-value="target_size" min="280" max="1680" step="14"/>
+      <span class="slider-value">{{target_size}}</span>
+    </div>
+
+    <div data-if="is_video_input">
+      <span class="help-text text-muted">Video frame extraction (ignored for image/COLMAP inputs). Adaptive strategy uses Min/Max; FPS is only a fallback.</span>
+      <div class="setting-row">
+        <span class="prop-label">Min frames</span>
+        <input type="range" class="setting-slider" data-value="video_min_frames" min="1" max="64" step="1"/>
+        <span class="slider-value">{{video_min_frames}}</span>
+      </div>
+      <div class="setting-row">
+        <span class="prop-label">Max frames</span>
+        <input type="range" class="setting-slider" data-value="video_max_frames" min="1" max="64" step="1"/>
+        <span class="slider-value">{{video_max_frames}}</span>
+      </div>
+      <div class="setting-row">
+        <span class="prop-label">Fallback FPS</span>
+        <input type="range" class="setting-slider" data-value="fps" min="1" max="30" step="1"/>
+        <span class="slider-value">{{fps}}</span>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <label class="setting-label"><input type="checkbox" data-checked="save_gs"/><span>Save Gaussian splats (gaussians.ply)</span></label>
+    </div>
+    <div class="setting-row">
+      <label class="setting-label"><input type="checkbox" data-checked="save_points"/><span>Save point cloud (points.ply)</span></label>
+    </div>
+    <div class="setting-row">
+      <label class="setting-label"><input type="checkbox" data-checked="save_depth"/><span>Save depth maps</span></label>
+    </div>
+    <div class="setting-row">
+      <label class="setting-label"><input type="checkbox" data-checked="save_normal"/><span>Save normal maps</span></label>
+    </div>
+    <div class="setting-row">
+      <label class="setting-label"><input type="checkbox" data-checked="apply_sky_mask"/><span>Apply sky mask</span></label>
+    </div>
+    <div class="setting-row" title="Run the model in bfloat16 instead of fp32. About half the activation memory for very similar quality. Requires Ampere-class or newer GPU (RTX 30xx / 40xx / 50xx). Changing this triggers a model reload on the next Run.">
+      <label class="setting-label"><input type="checkbox" data-checked="enable_bf16"/><span>bfloat16 inference (~half VRAM, needs Ampere+ GPU)</span></label>
+    </div>
+    <div class="setting-row" title="Probe free VRAM before inference and lower the effective target_size if needed — prevents OOM on large frame counts. User-set target_size is the upper bound. Disable only if you want to fail loudly instead of auto-downscaling.">
+      <label class="setting-label"><input type="checkbox" data-checked="auto_fit_target_size"/><span>Auto-fit target size to free VRAM (avoids OOM on large frame counts)</span></label>
+    </div>
+    <div class="setting-row" title="Release the ~2.4 GB bf16 / 4.7 GB fp32 WorldMirror weights from GPU after each reconstruction. Useful if you want to train on a big splat scene right after. The model reloads (~9 s) on the next Run.">
+      <label class="setting-label"><input type="checkbox" data-checked="auto_unload_model_after_run"/><span>Unload model after each Run (frees ~2.4 GB; +9s next Run)</span></label>
+    </div>
+    <div class="button-row">
+      <button class="btn btn--default btn--full" data-event-click="reset_vram_profile" title="Discard the learned VRAM profile. Useful after a GPU swap or if auto-fit has drifted too conservative.">Reset VRAM calibration</button>
+    </div>
+
+    <span class="help-text text-muted">Advanced (experimental — change forces a model reload on the next Run):</span>
+    <div class="setting-row" title="Wrap the model in torch.compile. First forward pays a 30-60s Inductor compile cost; subsequent forwards are faster. Compiled graphs cache to the plugin dir so the cost is only paid once per unique shape, across sessions.">
+      <label class="setting-label"><input type="checkbox" data-checked="enable_compile"/><span>torch.compile (first forward takes 30-60s; later runs faster)</span></label>
+    </div>
+    <div class="setting-row" title="reduce-overhead: fast compile, decent speedup. max-autotune: longest compile, fastest steady-state. default: safe middle ground.">
+      <span class="prop-label">Compile mode</span>
+      <select data-value="compile_mode">
+        <option value="reduce-overhead">reduce-overhead (recommended)</option>
+        <option value="max-autotune">max-autotune (longest compile, fastest)</option>
+        <option value="default">default</option>
+      </select>
+    </div>
+    <div class="setting-row" title="Force the model's prediction heads to run in fp32. Matches a full-fp32 baseline more tightly but runs ~30% slower. Leave off unless you're debugging numeric drift.">
+      <label class="setting-label"><input type="checkbox" data-checked="enable_fp32_heads"/><span>FP32 heads (~30% slower, matches fp32 reference more tightly)</span></label>
+    </div>
+    <div class="setting-row">
+      <label class="setting-label"><input type="checkbox" data-checked="auto_load_dataset"/><span>Auto-load dataset into LFS on success</span></label>
+    </div>
+
+    <div class="button-row">
+      <button class="btn btn--default btn--full" data-event-click="clear_models">Clear Cached Models (~5 GB on disk)</button>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- ============ Model status + actions ============ -->
+  <span class="help-text text-muted">{{model_status_line}}</span>
+  <span class="help-text text-muted">{{build_status_line}}</span>
+  <div class="button-row">
+    <button class="btn btn--default" data-event-click="download_models" data-if="show_download_btn">Download models</button>
+    <button class="btn btn--primary" data-event-click="load_model" data-if="show_load_btn">Load model</button>
+    <button class="btn btn--default" data-event-click="unload_model" data-if="show_unload_btn">Unload model</button>
+  </div>
+
+  <!-- ============ Run / Cancel ============ -->
+  <div data-if="show_idle">
+    <button class="btn btn--success btn--full action-btn" data-event-click="do_start" data-attrif-disabled="!can_run">Run Reconstruction</button>
+  </div>
+
+  <div data-if="show_running">
+    <span class="status-line text-default">Stage: {{stage_text}}</span>
+    <div class="progress-wrap">
+      <progress class="job-progress" max="1" data-attr-value="progress_value"></progress>
+      <span class="progress-text">{{progress_pct}}</span>
+    </div>
+    <span class="help-text text-muted">{{progress_status}}</span>
+    <button class="btn btn--warning btn--full action-btn" data-event-click="do_cancel">Cancel</button>
+  </div>
+
+  <!-- ============ Logs ============ -->
+  <div data-if="show_logs">
+    <div class="separator"></div>
+    <span class="section-title text-accent">Log</span>
+    <div class="log-box">
+      <span class="log-output text-muted">{{live_log_text}}</span>
+    </div>
+  </div>
+
+  <!-- ============ Result ============ -->
+  <div data-if="show_results">
+    <div class="separator"></div>
+    <span class="section-title text-accent">Result</span>
+    <span class="result-line text-default">Output: {{result_output}}</span>
+    <span class="result-line text-default">Frames: {{result_frames}}</span>
+    <span class="result-line text-default">Elapsed: {{result_time}}</span>
+
+    <div class="button-row" data-if="result_has_gs">
+      <button class="btn btn--default btn--full" data-event-click="load_gaussians_ply" data-attrif-disabled="splats_already_loaded">Load Pretrained Splats</button>
+    </div>
+    <div class="button-row" data-if="result_has_points">
+      <button class="btn btn--default btn--full" data-event-click="load_points_ply" data-attrif-disabled="points_already_loaded">Load Point Cloud</button>
+    </div>
+
+    <!-- Training initialization (direct / both modes) -->
+    <div data-if="has_scene_splats">
+      <div class="separator"></div>
+      <span class="section-title text-accent">Training init</span>
+      <span class="help-text text-muted">Training from: {{training_node_text}}</span>
+      <div class="button-row">
+        <button class="btn btn--primary" data-event-click="train_from_splats">Train from splats (refine)</button>
+        <button class="btn btn--default" data-event-click="train_from_points" data-attrif-disabled="!has_scene_points">Train from points (random init)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Error ============ -->
+  <div data-if="show_error">
+    <div class="separator"></div>
+    <span class="status-error">Error</span>
+    <span class="error-detail text-default">{{error_text}}</span>
+  </div>
+
+</div>
+</div>
+</body>
+</rml>

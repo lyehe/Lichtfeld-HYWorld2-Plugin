@@ -1,0 +1,65 @@
+[project]
+# PEP 508 allows [A-Za-z0-9._-]; LFS's plugin marketplace panel displays
+# this string verbatim as the human-facing name, so we pick something
+# readable. The plugin folder and internal import names (`hyworld2_plugin`)
+# are unchanged — only what users see in the "Plugins" list changes.
+name = "HY-World-Mirror-2.0"
+version = "0.1.0"
+description = "Reconstruct 3D scenes from images or video using Tencent HunyuanWorld-Mirror 2."
+# LFS ships Python 3.12 (vcpkg-bundled); the plugin venv is built from that
+# interpreter. hyworld2's upstream 3.10 pin is enforced only by gsplat's
+# prebuilt cp310 wheels — we use the pure-Python gsplat wheel from PyPI
+# instead, which JIT-compiles CUDA kernels on first import.
+requires-python = ">=3.12,<3.13"
+authors = [{name = "Yehe Liu"}]
+
+dependencies = [
+    # `hyworld2` is vendored inline at ./hyworld2/ and put on sys.path by
+    # __init__.py. What follows is the minimum set its LIVE inference path
+    # actually imports — audited by AST walk of hyworld2/ (excluding
+    # gradio_app/render_utils/visual_util export paths we stripped).
+    "gsplat==1.5.3",                                           # pure-Python wheel; JIT-compiles CUDA kernels
+    "huggingface-hub",                                         # model download
+    "torch==2.11.0",                                           # core
+    "torchvision==0.26.0",                                     # image transforms
+    "safetensors",                                             # weight loading
+    "numpy",
+    "einops",                                                  # tensor rearrange in the model
+    "omegaconf",                                               # pipeline config loader
+    "opencv-python",                                           # image I/O in inference_utils
+    "pillow",                                                  # image I/O in pipeline + our job runner
+    "plyfile",                                                 # gaussians.ply / points.ply output
+    "onnxruntime ; platform_system != 'Windows'",              # skyseg
+    "onnxruntime-gpu==1.19.2 ; platform_system == 'Windows'",
+    "triton-windows>=3.5 ; platform_system == 'Windows'",      # required by torch-cu130 on Windows
+]
+
+# Dropped vs upstream hyworld2 pyproject (none of these are reached by the
+# plugin's inference path after pruning):
+#   fastapi, gradio, uvicorn, python-multipart, pydantic, spaces  (web UI)
+#   open3d, moviepy                                               (only used by render_utils/gradio_app)
+#   matplotlib, trimesh, scipy, requests                          (only used by visual_util GLB-export; we stripped visual_util)
+#   colorspacious, jaxtyping, typeguard, torchmetrics             (transitive deps of uniception, which is unused)
+#   torchaudio                                                    (transitive dep of uniception, unused)
+#   uniception                                                    (no import in inference path)
+#   pillow-heif                                                   (only for HEIC input, never registered in our path)
+#   tqdm                                                          (kept transitively by huggingface-hub)
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchaudio = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.lichtfeld]
+# Hot-reload disabled: plugin owns ~5 GB of cached models + a 4.8 GB venv;
+# churning on every .py save is too expensive. Restart LFS to pick up edits.
+hot_reload = false
+plugin_api = ">=1,<2"
+lichtfeld_version = ">=0.5.0"
+required_features = []
+auto_start = false
