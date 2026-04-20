@@ -6,9 +6,9 @@ A feed-forward 3D reconstruction plugin for LichtFeld Studio. Runs Tencent's [Hu
 
 - **Three input modes**: image folder, video file, or existing COLMAP workspace (poses auto-extracted as prior).
 - **Three output modes**:
-  - **Direct** — tensors go straight into the LFS scene; in-memory trainer built via `lf.prepare_training_from_scene()`. Zero files written.
-  - **Dataset** — writes a COLMAP workspace (`images/`, `sparse/0/`, `gaussians.ply`, `points.ply`) and auto-imports.
-  - **Both** — preview instantly AND keep a trainable dataset on disk.
+  - **Direct** — tensors go straight into the LFS scene; in-memory trainer built via `lf.prepare_training_from_scene()`. The only files written are the staged JPGs in `<output_dir>/_frames/` that the scene cameras' `image_path` points at.
+  - **Dataset** — writes a full COLMAP workspace (`images/`, `sparse/0/`, `gaussians.ply`, `points.ply`, `camera_params.json`) and auto-imports via `lf.load_file(..., is_dataset=True, init_path=gaussians.ply)`.
+  - **Both** — scene preview (direct) AND the trainable COLMAP workspace on disk.
 - **Training-init buttons** — after a run, pick "Train from splats" (refine the WorldMirror output) or "Train from points" (classical random init from the point cloud).
 - **bf16 by default** on Ampere+ GPUs. Calibrated VRAM auto-fit avoids OOM on large frame counts.
 - **torch.compile** with persistent Inductor + Triton cache, gated behind a toggle.
@@ -84,11 +84,17 @@ HY-World-Mirror-2 (run_<timestamp>)
 └── points        (back-projected colored point cloud)
 ```
 
-**Dataset / Both mode** also writes to your chosen output folder:
+**Direct mode** also writes a single directory to your chosen output folder so the scene cameras have real image files to reference:
 
 ```
 <output_dir>/
-├── _frames/                      (staged input frames at inference res)
+└── _frames/                      (input frames at inference resolution — scene cameras' image_path targets)
+```
+
+**Dataset mode** writes the full COLMAP workspace (no `_frames/`):
+
+```
+<output_dir>/
 ├── images/                       (frames resized to sparse/0/cameras.txt dims)
 ├── sparse/0/
 │   ├── cameras.txt
@@ -98,6 +104,8 @@ HY-World-Mirror-2 (run_<timestamp>)
 ├── points.ply                    (colored point cloud)
 └── camera_params.json
 ```
+
+**Both mode** writes the union of the two trees (`_frames/` for scene cameras + the COLMAP workspace for training).
 
 ## Requirements
 
