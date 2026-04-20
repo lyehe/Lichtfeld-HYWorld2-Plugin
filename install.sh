@@ -55,6 +55,23 @@ echo "       -> $plugin_root"
 
 echo ""
 echo "Install complete."
+
+# Linux-only preflight: gsplat JIT-compiles CUDA kernels on first import and
+# needs both `nvcc` (bundled via the `nvidia-cuda-nvcc` pip wheel — installed
+# automatically by `uv sync`) and `gcc` as the host compiler. The host gcc
+# is NOT in the venv and must be installed system-wide.
+if [[ "$(uname)" == "Linux" ]]; then
+    if ! command -v gcc >/dev/null 2>&1; then
+        echo ""
+        echo "WARNING: 'gcc' not found in PATH."
+        echo "  gsplat will fail to build its CUDA kernels on first run."
+        echo "  Fix with:"
+        echo "      sudo apt install build-essential        # Debian/Ubuntu"
+        echo "      sudo dnf install gcc-c++ make           # Fedora/RHEL"
+        echo "      sudo pacman -S base-devel               # Arch"
+    fi
+fi
+
 echo ""
 echo "Next steps:"
 echo "  1. Launch LichtFeld Studio."

@@ -39,6 +39,20 @@ _TRITON_CACHE.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("TORCHINDUCTOR_CACHE_DIR", str(_COMPILE_CACHE))
 os.environ.setdefault("TRITON_CACHE_DIR", str(_TRITON_CACHE))
 
+# --- Linux: point gsplat's JIT at the venv-local nvcc (nvidia-cuda-nvcc
+# wheel) so users don't need a system-wide CUDA Toolkit. We scan the venv
+# site-packages for nvidia/*/bin/nvcc and set CUDA_HOME + prepend to PATH.
+# Windows users ship nvcc via the standalone CUDA Toolkit installer; we
+# don't touch CUDA_HOME there.
+if sys.platform.startswith("linux") and "CUDA_HOME" not in os.environ:
+    for _cand in _PLUGIN_DIR.glob(
+        ".venv/lib/python*/site-packages/nvidia/*/bin/nvcc"
+    ):
+        _cuda_root = _cand.parent.parent  # .../nvidia/<variant>
+        os.environ["CUDA_HOME"] = str(_cuda_root)
+        os.environ["PATH"] = str(_cuda_root / "bin") + os.pathsep + os.environ.get("PATH", "")
+        break
+
 # Expose the vendored `hyworld2` Python package on sys.path.
 if str(_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_DIR))
