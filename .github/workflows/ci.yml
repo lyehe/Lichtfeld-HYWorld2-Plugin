@@ -118,6 +118,9 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.12'
+          # We only `uv lock` (no install), so the cache path is empty
+          # and the default post-step fails trying to save it.
+          enable-cache: false
       - name: Resolve wheels (no download)
         # `uv lock` performs a full resolution against PyPI + the custom
         # pytorch-cu130 index but does NOT download any wheels. Fails CI
