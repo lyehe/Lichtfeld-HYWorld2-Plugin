@@ -87,6 +87,6 @@ Run click
 
 ## Credits
 
-- Tencent for the HunyuanWorld-Mirror model.
-- [@filliptm](https://github.com/filliptm) for the Playground fork whose perf work (SDPA priority, warmup, vectorized voxel prune, fp16/bf16 head gating) this plugin inherits through the vendored package.
+- **Tencent** for the HunyuanWorld-Mirror model and the original Python inference code.
+- The inference perf work in the vendored `hyworld2/` — SDPA backend-priority pin, cuDNN + PTX warmup, boot-time TF32 / `cudnn.benchmark` / `expandable_segments` flags, vectorized `_voxel_prune_gaussians`, parallelized `prepare_images_to_tensor`, ONNX sky-mask / GPU-forward overlap, pycolmap-free COLMAP writer, bf16 head gating via `HYWORLD_FP32_HEADS`, and the OOM-retry inference loop — is my own, originally landed in my local copy of the Playground layout; refer to [@filliptm/HY-World-2.0-Playground](https://github.com/filliptm/HY-World-2.0-Playground) only for the Playground's original API / file layout.
 - [LichtFeld Studio](https://github.com/MrNeRF/LichtFeld-Studio) for the plugin host.

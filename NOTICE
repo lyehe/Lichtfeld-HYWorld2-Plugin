@@ -9,11 +9,20 @@ Third-party code included in this distribution
 1. hyworld2/ (vendored Python package)
 ---------------------------------------
 Location in this repo:  hyworld2/
-Source:                 https://github.com/filliptm/HY-World-2.0-Playground
-License:                MIT (Copyright (c) 2026 filliptm)
+Origin (Python package layout): Tencent HunyuanWorld-Mirror 2
+                                https://github.com/Tencent-Hunyuan/HunyuanWorld-Mirror
+Playground reference layout:    https://github.com/filliptm/HY-World-2.0-Playground
+                                (MIT; Copyright (c) 2026 filliptm)
 
-The `hyworld2/` directory is a verbatim copy of the Python package from the
-Playground fork above, with two local modifications documented inline:
+The inference-path performance work present in hyworld2/ — SDPA backend
+priority pin, cuDNN + PTX JIT warmup, TF32 / cudnn.benchmark /
+expandable_segments boot flags, vectorized _voxel_prune_gaussians,
+parallelized prepare_images_to_tensor, ONNX sky-mask / GPU-forward
+overlap, pycolmap-free COLMAP writer, bf16 head gating via
+HYWORLD_FP32_HEADS, and the OOM-retry inference loop — is original work
+by Yehe Liu, licensed under MIT as part of this repository.
+
+Two local modifications in the vendored copy are specific to this plugin:
 
   - hyworld2/worldrecon/hyworldmirror/utils/save_utils.py
         Stores the opacity field as logit (pre-sigmoid) in the output PLY
