@@ -1,6 +1,9 @@
-.venv/
+/.venv/
 __pycache__/
 *.pyc
-uv.lock
-models/
-cache/
+/uv.lock
+# Root-anchored — we ship hyworld2/worldrecon/hyworldmirror/models/ (core
+# inference code). Only the top-level /models/ (downloaded HF weights) and
+# /cache/ (torch.compile / Triton caches) should be ignored.
+/models/
+/cache/
