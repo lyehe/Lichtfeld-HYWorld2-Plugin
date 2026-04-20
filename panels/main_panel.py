@@ -46,7 +46,7 @@ def _supports_bf16() -> bool:
         import torch
         if not torch.cuda.is_available():
             return False
-        major, minor = torch.cuda.get_device_capability(0)
+        major, _ = torch.cuda.get_device_capability(0)
         return major >= 8
     except Exception:
         return False
@@ -139,7 +139,6 @@ class HYWorld2Panel(lf.ui.Panel):
         self._last_model_state = ("", -1.0, "")
 
         self._collapsed = {"advanced"}
-        self._input_types = list(_INPUT_TYPES)
 
     # ------------------------------------------------------------------
     # Helpers / state
@@ -183,9 +182,6 @@ class HYWorld2Panel(lf.ui.Panel):
         except Exception:
             pass
         return self._model_load_state if self._model_load_state == "loading" else "idle"
-
-    def _model_loaded(self) -> bool:
-        return self._refresh_model_load_state() == "ready"
 
     def _model_loading(self) -> bool:
         return self._refresh_model_load_state() == "loading"
@@ -418,8 +414,8 @@ class HYWorld2Panel(lf.ui.Panel):
         model.bind_event("browse_output", self._on_browse_output)
         model.bind_event("browse_prior_cam", self._on_browse_prior_cam)
         model.bind_event("browse_prior_depth", self._on_browse_prior_depth)
-        model.bind_event("clear_prior_cam", lambda h, e, a: self._set_prior_cam_path(""))
-        model.bind_event("clear_prior_depth", lambda h, e, a: self._set_prior_depth_path(""))
+        model.bind_event("clear_prior_cam", lambda _h, _e, _a: self._set_prior_cam_path(""))
+        model.bind_event("clear_prior_depth", lambda _h, _e, _a: self._set_prior_depth_path(""))
         model.bind_event("do_start", self._on_start)
         model.bind_event("do_cancel", self._on_cancel)
         model.bind_event("load_gaussians_ply", self._on_load_gaussians)

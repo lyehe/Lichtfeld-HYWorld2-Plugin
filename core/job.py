@@ -103,12 +103,10 @@ class JobResult:
     num_frames: int = 0
     gaussians_ply: str = ""
     points_ply: str = ""
-    camera_params_json: str = ""
     images_dir: str = ""
     sparse_dir: str = ""
     scene_node_id: int = -1        # "direct" / "both" modes: root group id in scene
     splat_node_name: str = ""      # name of the per-run splat node in scene
-    points_node_name: str = ""     # name of the per-run point cloud node in scene
     points_data: object = None     # (pts_np, cols_np) tuple kept for train-from-points
     error: str = ""
 
@@ -613,7 +611,6 @@ class HyWorld2Job:
         # -------- Done --------------------------------------------------
         elapsed = time.time() - t_start
         splat_name = direct_info.get("splat_node_name", "") if direct_info else ""
-        points_name = direct_info.get("points_node_name", "") if direct_info else ""
         points_data = None
         if direct_info:
             pn = direct_info.get("points_np")
@@ -627,12 +624,10 @@ class HyWorld2Job:
             num_frames=len(staged_paths),
             gaussians_ply=str(outdir / "gaussians.ply") if (outdir / "gaussians.ply").is_file() else "",
             points_ply=str(outdir / "points.ply") if (outdir / "points.ply").is_file() else "",
-            camera_params_json=str(outdir / "camera_params.json") if (outdir / "camera_params.json").is_file() else "",
             images_dir=images_dir_str,
             sparse_dir=str(sparse_dir) if sparse_dir.is_dir() else "",
             scene_node_id=scene_node_id,
             splat_node_name=splat_name,
-            points_node_name=points_name,
             points_data=points_data,
         )
         with self._lock:

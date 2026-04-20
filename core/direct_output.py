@@ -448,7 +448,7 @@ def _add_point_cloud(scene, predictions, imgs, parent_id, node_name, max_points,
     from hyworld2.worldrecon.hyworldmirror.models.utils.camera_utils import vector_to_camera_matrices
     from hyworld2.worldrecon.hyworldmirror.utils.inference_utils import _compute_points_from_depth
 
-    B, S, C, H, W = imgs.shape
+    _B, S, _C, H, W = imgs.shape
     e3x4, intr = vector_to_camera_matrices(predictions["camera_params"], image_hw=(H, W))
     pts_np, cols_np = _compute_points_from_depth(
         predictions["depth"], imgs, e3x4[0], intr[0], S, H, W, filter_mask=None

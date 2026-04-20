@@ -22,8 +22,6 @@ from pathlib import Path
 @dataclass
 class _Camera:
     model: str
-    width: int
-    height: int
     params: list[float]
 
     def intrinsic_matrix(self) -> list[list[float]]:
@@ -50,8 +48,6 @@ def _parse_cameras_txt(path: Path) -> dict[int, _Camera]:
         cam_id = int(parts[0])
         cams[cam_id] = _Camera(
             model=parts[1],
-            width=int(parts[2]),
-            height=int(parts[3]),
             params=[float(x) for x in parts[4:]],
         )
     return cams

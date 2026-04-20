@@ -140,14 +140,6 @@ def loaded_bf16() -> bool:
         return _loaded_bf16 if _pipeline is not None else False
 
 
-def loaded_compile() -> tuple[bool, str]:
-    """Return (enabled, mode) of the cached pipeline's torch.compile."""
-    with _lock:
-        if _pipeline is None:
-            return (False, "")
-        return (_loaded_compile, _loaded_compile_mode)
-
-
 def get_status() -> dict:
     """Snapshot of build/warmup state for UI display.
 
