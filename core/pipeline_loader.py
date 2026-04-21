@@ -79,21 +79,11 @@ def get_pipeline(model_id: str = "tencent/HY-World-2.0",
     global _pipeline, _loaded_bf16, _loaded_compile, _loaded_compile_mode
 
     # Compile-path gate. If a prior warmup tripped the MSVC/Inductor
-    # compile error (Windows + LFS GUI-host embedded Python), silently
-    # fall back to eager. The flag is persistent — it's cleared only by
-    # clear_compile_block() or by deleting the file. The call to
-    # msvc_env.apply() is the *real* fix: it injects the VS Developer
-    # Prompt env vars so cl.exe can find the Windows SDK headers. We
-    # only drop to the fallback if that injection also fails to make
-    # compile work.
-    if enable_compile:
-        try:
-            from . import msvc_env
-            applied, reason = msvc_env.apply()
-            downloads._log_fn(f"MSVC env: {reason}")
-            del applied
-        except Exception as exc:
-            downloads._log_fn(f"MSVC env setup skipped: {exc}")
+    # compile error, silently fall back to eager. The flag is persistent
+    # — it's cleared only by clear_compile_block() or by deleting the
+    # flag file. We don't try to "fix" the user's compiler environment;
+    # if their existing tooling can compile Inductor kernels, great, if
+    # not we disable and move on.
     if enable_compile and _compile_is_blocked():
         downloads._log_fn(
             "torch.compile disabled — prior Inductor compile failed on this "
