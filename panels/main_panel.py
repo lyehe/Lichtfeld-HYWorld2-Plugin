@@ -406,7 +406,7 @@ class HYWorld2Panel(lf.ui.Panel):
         model.bind_func("total_images", self._total_images)
         model.bind_func("selected_images_count", self._selected_images_count)
         model.bind_func("has_images", lambda: self._total_images() > 0)
-        model.bind_func("image_files", lambda: self._image_files)
+        model.bind_func("image_rows", self._image_rows)
         model.bind("image_count_target",
                    lambda: str(self._image_count_target),
                    self._set_image_count_target)
@@ -602,7 +602,7 @@ class HYWorld2Panel(lf.ui.Panel):
     _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
     _IMAGE_DIRTY = (
         "total_images", "selected_images_count", "image_count_target",
-        "image_files", "has_images",
+        "image_rows", "has_images",
     )
 
     def _scan_images(self) -> None:
@@ -635,6 +635,20 @@ class HYWorld2Panel(lf.ui.Panel):
 
     def _selected_images_count(self) -> int:
         return sum(1 for f in self._image_files if f["selected"])
+
+    def _image_rows(self) -> list[str]:
+        """Pre-formatted row text for the data-for loop in RML.
+
+        RmlUi's data-for loop variable doesn't expose dict fields via
+        dotted access, so we flatten to `"[x] name"` / `"[ ] name"`
+        strings and let the row template consume them with `{{row}}`.
+        Row index (for click handlers) comes from RmlUi's built-in
+        `it_index` loop variable.
+        """
+        return [
+            f"{'[x]' if f['selected'] else '[ ]'} {f['name']}"
+            for f in self._image_files
+        ]
 
     def _apply_stride(self, target: int) -> None:
         """Keep `target` images evenly spaced across the full list."""

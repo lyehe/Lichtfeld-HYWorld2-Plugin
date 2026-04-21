@@ -58,7 +58,7 @@
         <span class="text-muted">{{selected_images_count}} of {{total_images}} selected</span>
       </div>
       <div class="setting-row">
-        <input type="range" min="1" max="{{total_images}}" step="1" data-value="image_count_target"/>
+        <input type="range" min="1" data-attr-max="total_images" step="1" data-value="image_count_target"/>
       </div>
       <div class="button-row">
         <button class="btn btn--default" data-event-click="select_all_images">All</button>
@@ -70,10 +70,7 @@
         <span>Image list ({{total_images}})</span>
       </div>
       <div class="section-content collapsed" id="sec-image_list">
-        <div data-for="img : image_files" class="image-row" data-event-click="toggle_image(img.index)">
-          <span data-if="img.selected">[x] {{img.name}}</span>
-          <span data-if="!img.selected" class="text-muted">[ ] {{img.name}}</span>
-        </div>
+        <div data-for="row : image_rows" class="image-row" data-event-click="toggle_image(it_index)">{{row}}</div>
       </div>
     </div>
     <div data-if="!has_images &amp;&amp; has_input">
