@@ -406,7 +406,10 @@ class HYWorld2Panel(lf.ui.Panel):
         model.bind_func("total_images", self._total_images)
         model.bind_func("selected_images_count", self._selected_images_count)
         model.bind_func("has_images", lambda: self._total_images() > 0)
-        model.bind_func("image_rows", self._image_rows)
+        # bind_record_list registers an iterable list whose items keep
+        # dotted-field access in RML (img.name / img.selected / img.index).
+        # The list itself is pushed via handle.update_record_list().
+        model.bind_record_list("image_files")
         model.bind("image_count_target",
                    lambda: str(self._image_count_target),
                    self._set_image_count_target)
@@ -602,7 +605,7 @@ class HYWorld2Panel(lf.ui.Panel):
     _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
     _IMAGE_DIRTY = (
         "total_images", "selected_images_count", "image_count_target",
-        "image_rows", "has_images",
+        "has_images",
     )
 
     def _scan_images(self) -> None:
@@ -625,10 +628,16 @@ class HYWorld2Panel(lf.ui.Panel):
             )
         except OSError:
             return
+        # RmlUi record-list items need string-typed indices for the
+        # event-arg round-trip (`toggle_image(img.index)` → args[0] comes
+        # back as a string). Store `index` as str up-front rather than
+        # converting at each event-handler call site.
         self._image_files = [
-            {"name": n, "selected": True, "index": i} for i, n in enumerate(names)
+            {"name": n, "selected": True, "index": str(i)}
+            for i, n in enumerate(names)
         ]
         self._image_count_target = len(self._image_files)
+        self._push_image_files()
 
     def _total_images(self) -> int:
         return len(self._image_files)
@@ -636,19 +645,20 @@ class HYWorld2Panel(lf.ui.Panel):
     def _selected_images_count(self) -> int:
         return sum(1 for f in self._image_files if f["selected"])
 
-    def _image_rows(self) -> list[str]:
-        """Pre-formatted row text for the data-for loop in RML.
+    def _push_image_files(self) -> None:
+        """Ship the current list to the bound RmlUi record list.
 
-        RmlUi's data-for loop variable doesn't expose dict fields via
-        dotted access, so we flatten to `"[x] name"` / `"[ ] name"`
-        strings and let the row template consume them with `{{row}}`.
-        Row index (for click handlers) comes from RmlUi's built-in
-        `it_index` loop variable.
+        Lists can't be exposed via `bind_func` — RmlUi needs the record-
+        list API for per-item iteration with field access. After any
+        mutation to `self._image_files` this pushes the fresh snapshot
+        so `data-for="img : image_files"` re-renders.
         """
-        return [
-            f"{'[x]' if f['selected'] else '[ ]'} {f['name']}"
-            for f in self._image_files
-        ]
+        if self._handle is None:
+            return
+        try:
+            self._handle.update_record_list("image_files", self._image_files)
+        except Exception as exc:
+            lf.log.warn(f"[hyworld2] update_record_list failed: {exc}")
 
     def _apply_stride(self, target: int) -> None:
         """Keep `target` images evenly spaced across the full list."""
@@ -780,6 +790,7 @@ class HYWorld2Panel(lf.ui.Panel):
         if t == self._image_count_target and t == self._selected_images_count():
             return
         self._apply_stride(t)
+        self._push_image_files()
         self._dirty(*self._IMAGE_DIRTY)
 
     def _on_toggle_image(self, handle, event, args):
@@ -793,6 +804,7 @@ class HYWorld2Panel(lf.ui.Panel):
         if 0 <= idx < len(self._image_files):
             self._image_files[idx]["selected"] = not self._image_files[idx]["selected"]
             self._image_count_target = self._selected_images_count()
+            self._push_image_files()
             self._dirty(*self._IMAGE_DIRTY)
 
     def _on_select_all_images(self, handle, event, args):
@@ -800,6 +812,7 @@ class HYWorld2Panel(lf.ui.Panel):
         for f in self._image_files:
             f["selected"] = True
         self._image_count_target = len(self._image_files)
+        self._push_image_files()
         self._dirty(*self._IMAGE_DIRTY)
 
     def _on_select_no_images(self, handle, event, args):
@@ -807,6 +820,7 @@ class HYWorld2Panel(lf.ui.Panel):
         for f in self._image_files:
             f["selected"] = False
         self._image_count_target = 0
+        self._push_image_files()
         self._dirty(*self._IMAGE_DIRTY)
 
     # ------------------------------------------------------------------
