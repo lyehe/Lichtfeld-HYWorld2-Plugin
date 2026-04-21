@@ -72,11 +72,11 @@
       <div class="section-content collapsed" id="sec-image_list">
         <div data-for="img : image_files" class="image-row" data-event-click="toggle_image(img.index)">
           <span data-if="img.selected">[x] {{img.name}}</span>
-          <span data-if="not img.selected" class="text-muted">[ ] {{img.name}}</span>
+          <span data-if="!img.selected" class="text-muted">[ ] {{img.name}}</span>
         </div>
       </div>
     </div>
-    <div data-if="not has_images and has_input">
+    <div data-if="!has_images &amp;&amp; has_input">
       <span class="help-text text-muted">No .jpg / .jpeg / .png / .webp files found in this folder.</span>
     </div>
   </div>
