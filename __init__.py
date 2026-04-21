@@ -16,53 +16,17 @@ import os
 import sys
 from pathlib import Path
 
-# --- Survive embedded-Python stderr that rejects flush() ---
-# LFS on Windows hands plugins a sys.stderr whose .flush() raises
-# OSError(EINVAL). tqdm's status_printer calls sys.stderr.flush() at
-# construction, so any transitive tqdm user (huggingface_hub progress
-# bars, torch model loading, etc.) crashes the panel on first import.
-# Two-layer defence: tell HF to skip its progress bars (cheaper path,
-# no tqdm object gets built) AND wrap sys.stderr so stray .flush() calls
-# elsewhere silently succeed.
-os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
-
-
-class _FlushSafeStderr:
-    """Delegates to wrapped stream; swallows OSError from .flush().
-
-    Kept minimal (write/flush/fileno explicit; everything else via
-    __getattr__) so callers that inspect .isatty(), .fileno(),
-    .encoding, etc., see the real stream's values — only .flush()
-    behavior changes.
-    """
-
-    __slots__ = ("_s",)
-
-    def __init__(self, stream) -> None:
-        object.__setattr__(self, "_s", stream)
-
-    def write(self, s):  # noqa: D401
-        return self._s.write(s)
-
-    def writelines(self, lines):
-        return self._s.writelines(lines)
-
-    def flush(self):
-        try:
-            self._s.flush()
-        except OSError:
-            pass
-
-    def __getattr__(self, name):
-        return getattr(self._s, name)
-
-
-_stderr = sys.stderr
-if _stderr is not None:
+# LFS's embedded Python on Windows hands plugins a sys.stderr whose
+# .flush() raises OSError(EINVAL). tqdm calls flush() on construction,
+# so huggingface_hub's download progress bar (and any other transitive
+# tqdm user) crashes on first import. Raw plugin stderr has no consumer
+# here — LFS surfaces output through lf.log — so repoint it at a real
+# writable sink whose flush() actually works.
+if sys.stderr is not None:
     try:
-        _stderr.flush()
+        sys.stderr.flush()
     except OSError:
-        sys.stderr = _FlushSafeStderr(_stderr)
+        sys.stderr = open(os.devnull, "w", buffering=1)
 
 # --- Plugin-local HF cache (must be set BEFORE any huggingface_hub import) ---
 _PLUGIN_DIR = Path(__file__).resolve().parent
