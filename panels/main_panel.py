@@ -138,7 +138,17 @@ class HYWorld2Panel(lf.ui.Panel):
         self._last_result_key = None
         self._last_model_state = ("", -1.0, "")
 
-        self._collapsed = {"advanced"}
+        self._collapsed = {"advanced", "image_list"}
+
+        # Image-folder subset selection. Populated when input_type is
+        # "images" and input_path points to a directory. Each entry is
+        # {"name": str, "selected": bool, "index": int} where "index"
+        # is stable (matches position in the list) for click handlers.
+        self._image_files: list[dict] = []
+        # Slider target — number of images to keep when "Even" stride
+        # sampling is applied. Tracks the current selected count when
+        # the user toggles items manually.
+        self._image_count_target: int = 0
 
     # ------------------------------------------------------------------
     # Helpers / state
@@ -392,6 +402,15 @@ class HYWorld2Panel(lf.ui.Panel):
         model.bind_func("is_colmap_input", lambda: self.input_type == "colmap")
         model.bind_func("browse_input_label", self._browse_input_label)
 
+        # Image subset controls (image-folder input only)
+        model.bind_func("total_images", self._total_images)
+        model.bind_func("selected_images_count", self._selected_images_count)
+        model.bind_func("has_images", lambda: self._total_images() > 0)
+        model.bind_func("image_files", lambda: self._image_files)
+        model.bind("image_count_target",
+                   lambda: str(self._image_count_target),
+                   self._set_image_count_target)
+
         # Model download state
         model.bind_func("models_ready", self._models_ready)
         model.bind_func("models_downloading", self._models_downloading)
@@ -416,6 +435,9 @@ class HYWorld2Panel(lf.ui.Panel):
         model.bind_event("browse_prior_depth", self._on_browse_prior_depth)
         model.bind_event("clear_prior_cam", lambda _h, _e, _a: self._set_prior_cam_path(""))
         model.bind_event("clear_prior_depth", lambda _h, _e, _a: self._set_prior_depth_path(""))
+        model.bind_event("toggle_image", self._on_toggle_image)
+        model.bind_event("select_all_images", self._on_select_all_images)
+        model.bind_event("select_no_images", self._on_select_no_images)
         model.bind_event("do_start", self._on_start)
         model.bind_event("do_cancel", self._on_cancel)
         model.bind_event("load_gaussians_ply", self._on_load_gaussians)
@@ -576,18 +598,78 @@ class HYWorld2Panel(lf.ui.Panel):
         }.get(self.input_type, "Browse")
 
     # ------------------------------------------------------------------
+    # Image subset helpers (image-folder input only)
+    _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+    _IMAGE_DIRTY = (
+        "total_images", "selected_images_count", "image_count_target",
+        "image_files", "has_images",
+    )
+
+    def _scan_images(self) -> None:
+        """Rescan ``input_path`` for image files (image-folder mode only).
+
+        Resets selection to all-selected. Safe to call when not in image
+        mode (clears state).
+        """
+        self._image_files = []
+        self._image_count_target = 0
+        if self.input_type != "images" or not self.input_path:
+            return
+        p = Path(self.input_path)
+        if not p.is_dir():
+            return
+        try:
+            names = sorted(
+                f.name for f in p.iterdir()
+                if f.is_file() and f.suffix.lower() in self._IMAGE_EXTS
+            )
+        except OSError:
+            return
+        self._image_files = [
+            {"name": n, "selected": True, "index": i} for i, n in enumerate(names)
+        ]
+        self._image_count_target = len(self._image_files)
+
+    def _total_images(self) -> int:
+        return len(self._image_files)
+
+    def _selected_images_count(self) -> int:
+        return sum(1 for f in self._image_files if f["selected"])
+
+    def _apply_stride(self, target: int) -> None:
+        """Keep `target` images evenly spaced across the full list."""
+        n = len(self._image_files)
+        if n == 0:
+            return
+        t = max(1, min(n, int(target)))
+        if t == 1:
+            picked = {0}
+        else:
+            picked = {round(i * (n - 1) / (t - 1)) for i in range(t)}
+        for i, f in enumerate(self._image_files):
+            f["selected"] = i in picked
+        self._image_count_target = self._selected_images_count()
+
+    # ------------------------------------------------------------------
     # Setters
     def _set_input_path(self, value) -> None:
-        self.input_path = str(value or "").strip()
+        new = str(value or "").strip()
+        if new != self.input_path:
+            self.input_path = new
+            self._scan_images()
+            self._dirty(*self._IMAGE_DIRTY)
+        else:
+            self.input_path = new
         self._dirty("input_path", "input_summary", "has_input", "can_run")
 
     def _set_input_type(self, value) -> None:
         v = str(value or "").strip().lower()
         if v in _INPUT_TYPES and v != self.input_type:
             self.input_type = v
+            self._scan_images()
             self._dirty(
                 "input_type", "is_video_input", "is_image_input",
-                "is_colmap_input", "browse_input_label",
+                "is_colmap_input", "browse_input_label", *self._IMAGE_DIRTY,
             )
 
     def _set_prior_cam_path(self, value) -> None:
@@ -652,7 +734,7 @@ class HYWorld2Panel(lf.ui.Panel):
     def _sync_section_states(self) -> None:
         if not self._doc:
             return
-        for name in ("advanced", "priors"):
+        for name in ("advanced", "priors", "image_list"):
             content = self._doc.get_element_by_id(f"sec-{name}")
             arrow = self._doc.get_element_by_id(f"arrow-{name}")
             if content:
@@ -670,6 +752,48 @@ class HYWorld2Panel(lf.ui.Panel):
         else:
             self._collapsed.add(name)
         self._sync_section_states()
+
+    def _set_image_count_target(self, v) -> None:
+        """Slider setter. Stride-samples ``v`` images across the full list."""
+        try:
+            t = int(float(v))
+        except (TypeError, ValueError):
+            return
+        n = self._total_images()
+        if n == 0:
+            return
+        t = max(1, min(n, t))
+        if t == self._image_count_target and t == self._selected_images_count():
+            return
+        self._apply_stride(t)
+        self._dirty(*self._IMAGE_DIRTY)
+
+    def _on_toggle_image(self, handle, event, args):
+        del handle, event
+        if not args:
+            return
+        try:
+            idx = int(float(args[0]))
+        except (TypeError, ValueError):
+            return
+        if 0 <= idx < len(self._image_files):
+            self._image_files[idx]["selected"] = not self._image_files[idx]["selected"]
+            self._image_count_target = self._selected_images_count()
+            self._dirty(*self._IMAGE_DIRTY)
+
+    def _on_select_all_images(self, handle, event, args):
+        del handle, event, args
+        for f in self._image_files:
+            f["selected"] = True
+        self._image_count_target = len(self._image_files)
+        self._dirty(*self._IMAGE_DIRTY)
+
+    def _on_select_no_images(self, handle, event, args):
+        del handle, event, args
+        for f in self._image_files:
+            f["selected"] = False
+        self._image_count_target = 0
+        self._dirty(*self._IMAGE_DIRTY)
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -824,6 +948,19 @@ class HYWorld2Panel(lf.ui.Panel):
         self._last_progress = -1.0
         self._last_status = ""
 
+        # Image subset — only pass a list when it's a real subset (not
+        # all-selected and not empty). Empty list means "run nothing" and
+        # should fall through to a clear error rather than confusing the
+        # pipeline with a bogus input dir.
+        selected_paths: list[str] | None = None
+        if self.input_type == "images" and self._image_files:
+            root = Path(self.input_path)
+            chosen = [
+                str(root / f["name"]) for f in self._image_files if f["selected"]
+            ]
+            if 0 < len(chosen) < len(self._image_files):
+                selected_paths = chosen
+
         cfg = JobConfig(
             input_path=self.input_path,
             output_dir=self.output_dir,
@@ -845,6 +982,7 @@ class HYWorld2Panel(lf.ui.Panel):
             enable_fp32_heads=self.enable_fp32_heads,
             prior_cam_path=self.prior_cam_path,
             prior_depth_path=self.prior_depth_path,
+            selected_images=selected_paths,
         )
         self._job = HyWorld2Job(cfg)
         self._job.start()

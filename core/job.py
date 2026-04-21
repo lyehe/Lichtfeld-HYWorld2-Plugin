@@ -82,6 +82,13 @@ class JobConfig:
     prior_cam_path: str = ""
     prior_depth_path: str = ""
 
+    # Image-subset selection (image-folder input only). When non-None,
+    # the runner hardlinks (or copies) these files into a per-run subset
+    # directory and feeds that to the pipeline instead of the original
+    # input_path, so hyworld2's internal re-glob only sees the chosen
+    # subset. None = use every image in input_path (default).
+    selected_images: list[str] | None = None
+
     # Post-processing (dataset mode)
     copy_images_for_dataset: bool = True
 
@@ -308,6 +315,40 @@ class HyWorld2Job:
                 "here it means LFS's plugin venv hasn't finished resolving "
                 "dependencies. Check the LFS log for 'uv sync' errors."
             ) from exc
+
+        # Image-subset staging: if the panel selected a strict subset of
+        # the folder, materialize it into `outdir/_input_subset/` and feed
+        # that dir to the pipeline. Hardlink first (instant; works on
+        # NTFS without admin and on Linux everywhere), fall back to copy
+        # when the runner is on a different volume / filesystem.
+        if cfg.selected_images and input_path.is_dir():
+            import os as _os
+            import shutil as _shutil
+            subset_dir = outdir / "_input_subset"
+            subset_dir.mkdir(parents=True, exist_ok=True)
+            # Clear any stale content from a prior run with a different subset.
+            for stale in subset_dir.iterdir():
+                if stale.is_file():
+                    stale.unlink()
+            hardlinks = 0
+            copies = 0
+            for src in cfg.selected_images:
+                sp = Path(src)
+                if not sp.is_file():
+                    continue
+                dst = subset_dir / sp.name
+                try:
+                    _os.link(sp, dst)
+                    hardlinks += 1
+                except OSError:
+                    _shutil.copy2(sp, dst)
+                    copies += 1
+            total = hardlinks + copies
+            self._log_line(
+                f"Using selected subset: {total} images staged via "
+                f"{hardlinks} hardlink(s) + {copies} copy/-ies."
+            )
+            input_path = subset_dir
 
         self._log_line(f"Preparing input: {input_path}")
         img_paths, _subdir = prepare_input(

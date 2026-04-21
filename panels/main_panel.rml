@@ -50,6 +50,37 @@
     <button class="btn btn--default btn--full" data-event-click="use_current_scene" title="Extract camera poses from the currently-loaded LFS scene (must have been loaded from COLMAP) and use them as an inference prior.">Use current LFS scene as prior</button>
   </div>
 
+  <!-- Image-subset selector (image-folder input only) -->
+  <div data-if="is_image_input">
+    <div data-if="has_images">
+      <div class="setting-row" title="Pick how many frames to feed the model. The slider stride-samples evenly across the folder; the list below lets you toggle individual frames.">
+        <span class="prop-label">Frames</span>
+        <span class="text-muted">{{selected_images_count}} of {{total_images}} selected</span>
+      </div>
+      <div class="setting-row">
+        <input type="range" min="1" max="{{total_images}}" step="1" data-value="image_count_target"/>
+      </div>
+      <div class="button-row">
+        <button class="btn btn--default" data-event-click="select_all_images">All</button>
+        <button class="btn btn--default" data-event-click="select_no_images">None</button>
+      </div>
+
+      <div class="section-header" data-event-click="toggle_section('image_list')">
+        <span class="section-arrow" id="arrow-image_list">&#x25B6;</span>
+        <span>Image list ({{total_images}})</span>
+      </div>
+      <div class="section-content collapsed" id="sec-image_list">
+        <div data-for="img : image_files" class="image-row" data-event-click="toggle_image(img.index)">
+          <span data-if="img.selected">[x] {{img.name}}</span>
+          <span data-if="not img.selected" class="text-muted">[ ] {{img.name}}</span>
+        </div>
+      </div>
+    </div>
+    <div data-if="not has_images and has_input">
+      <span class="help-text text-muted">No .jpg / .jpeg / .png / .webp files found in this folder.</span>
+    </div>
+  </div>
+
   <div class="separator"></div>
 
   <!-- ============ Output ============ -->
